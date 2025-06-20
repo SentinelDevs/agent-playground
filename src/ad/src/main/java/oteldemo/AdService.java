@@ -39,13 +39,6 @@ import oteldemo.Demo.AdRequest;
 import oteldemo.Demo.AdResponse;
 import oteldemo.problempattern.GarbageCollectionTrigger;
 import oteldemo.problempattern.CPULoad;
-import dev.openfeature.contrib.providers.flagd.FlagdOptions;
-import dev.openfeature.contrib.providers.flagd.FlagdProvider;
-import dev.openfeature.sdk.Client;
-import dev.openfeature.sdk.EvaluationContext;
-import dev.openfeature.sdk.MutableContext;
-import dev.openfeature.sdk.OpenFeatureAPI;
-import java.util.UUID;
 
 
 public final class AdService {
@@ -83,16 +76,6 @@ public final class AdService {
                             "environment vars: AD_PORT must not be null")));
     healthMgr = new HealthStatusManager();
 
-    // Create a flagd instance with OpenTelemetry
-    FlagdOptions options =
-        FlagdOptions.builder()
-            .withGlobalTelemetry(true)
-            .build();
-
-    FlagdProvider flagdProvider = new FlagdProvider(options);
-    // Set flagd as the OpenFeature Provider
-    OpenFeatureAPI.getInstance().setProvider(flagdProvider);
-  
     server =
         ServerBuilder.forPort(port)
             .addService(new AdServiceImpl())
@@ -132,11 +115,6 @@ public final class AdService {
 
   private static class AdServiceImpl extends oteldemo.AdServiceGrpc.AdServiceImplBase {
     
-    private static final String AD_FAILURE = "adFailure";
-    private static final String AD_MANUAL_GC_FEATURE_FLAG = "adManualGc";
-    private static final String AD_HIGH_CPU_FEATURE_FLAG = "adHighCpu";
-    private static final Client ffClient = OpenFeatureAPI.getInstance().getClient();
-    
     private AdServiceImpl() {}
 
     /**
@@ -158,18 +136,15 @@ public final class AdService {
         AdResponseType adResponseType;
 
         Baggage baggage = Baggage.fromContextOrNull(Context.current());
-        MutableContext evaluationContext = new MutableContext();
         if (baggage != null) {
           final String sessionId = baggage.getEntryValue("session.id");
           span.setAttribute("session.id", sessionId);
-          evaluationContext.setTargetingKey(sessionId);
-          evaluationContext.add("session", sessionId);
         } else {
           logger.info("no baggage found in context");
         }
 
         CPULoad cpuload = CPULoad.getInstance();
-        cpuload.execute(ffClient.getBooleanValue(AD_HIGH_CPU_FEATURE_FLAG, false, evaluationContext));
+        cpuload.execute(false);
 
         span.setAttribute("app.ads.contextKeys", req.getContextKeysList().toString());
         span.setAttribute("app.ads.contextKeys.count", req.getContextKeysCount());
@@ -200,17 +175,6 @@ public final class AdService {
             1,
             Attributes.of(
                 adRequestTypeKey, adRequestType.name(), adResponseTypeKey, adResponseType.name()));
-
-        // Throw 1/10 of the time to simulate a failure when the feature flag is enabled
-        if (ffClient.getBooleanValue(AD_FAILURE, false, evaluationContext) && random.nextInt(10) == 0) {
-          throw new StatusRuntimeException(Status.UNAVAILABLE);
-        }
-
-        if (ffClient.getBooleanValue(AD_MANUAL_GC_FEATURE_FLAG, false, evaluationContext)) {
-          logger.warn("Feature Flag " + AD_MANUAL_GC_FEATURE_FLAG + " enabled, performing a manual gc now");
-          GarbageCollectionTrigger gct = new GarbageCollectionTrigger();
-          gct.doExecute();
-        }
 
         AdResponse reply = AdResponse.newBuilder().addAllAds(allAds).build();
         responseObserver.onNext(reply);
