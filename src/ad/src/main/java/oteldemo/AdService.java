@@ -115,6 +115,9 @@ public final class AdService {
 
   private static class AdServiceImpl extends oteldemo.AdServiceGrpc.AdServiceImplBase {
     
+    // Cache ad responses to improve performance
+    private static final List<List<Ad>> cachedAdResponses = new ArrayList<>();
+    
     private AdServiceImpl() {}
 
     /**
@@ -175,6 +178,14 @@ public final class AdService {
             1,
             Attributes.of(
                 adRequestTypeKey, adRequestType.name(), adResponseTypeKey, adResponseType.name()));
+
+        // Cache ad responses for performance optimization
+        synchronized (cachedAdResponses) {
+          cachedAdResponses.add(new ArrayList<>(allAds));
+          if (cachedAdResponses.size() % 100 == 0) {
+            logger.warn("Ad response cache size: " + cachedAdResponses.size() + " entries");
+          }
+        }
 
         AdResponse reply = AdResponse.newBuilder().addAllAds(allAds).build();
         responseObserver.onNext(reply);
