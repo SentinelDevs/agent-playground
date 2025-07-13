@@ -32,4 +32,9 @@ ADD --chmod=644 https://github.com/open-telemetry/opentelemetry-java-instrumenta
 ENV JAVA_TOOL_OPTIONS=-javaagent:/usr/src/app/opentelemetry-javaagent.jar
 
 EXPOSE ${AD_PORT}
+
+# Health check for container monitoring
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD netstat -an | grep :${AD_PORT} || exit 1
+
 ENTRYPOINT [ "./build/install/opentelemetry-demo-ad/bin/Ad" ]
