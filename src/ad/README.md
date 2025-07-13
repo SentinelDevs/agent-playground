@@ -3,6 +3,13 @@
 The Ad service provides advertisement based on context keys. If no context keys
 are provided then it returns random ads.
 
+## Features
+
+- **Context-based targeting**: Serves ads based on provided context keys
+- **Response caching**: Caches ad responses to improve performance and reduce lookup time
+- **Fallback mechanism**: Returns random ads when no targeted ads are available
+- **OpenTelemetry integration**: Full observability with traces, metrics, and logs
+
 ## Building Locally
 
 The Ad service requires at least JDK 17 to build and uses gradlew to
